@@ -2,7 +2,7 @@ import unicodedata
 
 import pytest
 
-from main import SistemaAutenticacion
+from sistema_autenticacion import SistemaAutenticacion
 
 
 @pytest.fixture
