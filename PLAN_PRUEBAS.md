@@ -1,10 +1,10 @@
-# Plan de pruebas - SistemaAutenticacion
+# Plan de pruebas ejecutado - SistemaAutenticacion
 
 ## Objetivo
 
-Validar que la clase `SistemaAutenticacion` controle correctamente la validacion de contraseñas, el flujo de login, el bloqueo por intentos fallidos y el reinicio del estado de bloqueo.
+Validar el comportamiento real de la clase `SistemaAutenticacion` mediante la suite automatizada `pytest` incluida en `test_sistema_autenticacion.py`.
 
-El plan tambien busca identificar riesgos de seguridad derivados del comportamiento actual de la clase.
+Este documento describe unicamente las pruebas que realmente fueron implementadas y ejecutadas.
 
 ## Alcance
 
@@ -18,129 +18,134 @@ Metodos bajo prueba:
 - `intentar_login(password_ingresada, password_correcta)`
 - `resetear_bloqueo()`
 
-Estados internos relevantes:
+Estados internos verificados:
 
 - `intentos_fallidos`
 - `bloqueado`
 - `MAX_INTENTOS`
-- `passwords_comunes`
 
-## Criterios de aceptacion
+## Resumen de cobertura ejecutada
 
-La clase se considera correcta para este alcance si:
+| Area | Cantidad de pruebas ejecutadas |
+| --- | ---: |
+| Validacion de passwords invalidas | 8 |
+| Validacion de passwords validas | 5 |
+| Entradas no string o no convencionales | 3 |
+| Flujo de login y bloqueo | 8 |
+| Reset de bloqueo | 2 |
+| Casos de seguridad y limite adicionales | 2 |
+| **Total** | **28** |
 
-- Rechaza contraseñas que no cumplen las reglas minimas.
-- Acepta contraseñas validas segun las reglas implementadas.
-- Incrementa el contador de intentos fallidos en logins incorrectos.
-- Bloquea la cuenta al tercer intento fallido.
-- Impide el acceso cuando la cuenta esta bloqueada.
-- Reinicia el estado con `resetear_bloqueo()`.
-- Maneja casos limite relevantes sin fallos inesperados, cuando el comportamiento actual lo permite.
+## Casos de prueba ejecutados
 
-## Reglas de validacion de contraseña
+### Validacion de passwords invalidas
 
-La contraseña debe cumplir:
-
-- Longitud minima de 8 caracteres.
-- Al menos una letra mayuscula.
-- Al menos un numero.
-- Al menos un caracter especial permitido: `@$!%*?&`.
-- No estar en la lista de contraseñas comunes.
-
-## Casos de prueba funcionales
-
-| ID | Caso | Entrada | Resultado esperado |
-| --- | --- | --- | --- |
-| CP01 | Contraseña valida | `Password1!` | Valida |
-| CP02 | Menos de 8 caracteres | `Pass1!A` | Rechazada por longitud |
-| CP03 | Sin mayuscula | `password1!` | Rechazada por falta de mayuscula |
-| CP04 | Sin numero | `Password!` | Rechazada por falta de numero |
-| CP05 | Sin caracter especial permitido | `Password1` | Rechazada por falta de caracter especial |
-| CP06 | Contraseña comun sin mayuscula | `admin123!` | Rechazada por falta de mayuscula, debido al orden actual de validacion |
-| CP07 | Contraseña comun con mayuscula | `Admin123!` | Rechazada por ser comun |
-| CP08 | Longitud exactamente valida | `Passw1!A` | Valida |
-| CP09 | Caracter especial no permitido | `Password1#` | Rechazada |
-| CP10 | Caracter especial permitido | `Password1@` | Valida |
-
-## Casos de prueba de login
-
-| ID | Caso | Estado inicial | Entrada | Resultado esperado |
-| --- | --- | --- | --- | --- |
-| CP11 | Login correcto | No bloqueado | `Password1!`, `Password1!` | Acceso concedido |
-| CP12 | Login incorrecto una vez | No bloqueado | `Wrongpass1!`, `Password1!` | Intentos restantes: 2 |
-| CP13 | Login incorrecto dos veces | 1 fallo previo | `Wrongpass1!`, `Password1!` | Intentos restantes: 1 |
-| CP14 | Login incorrecto tercer intento | 2 fallos previos | `Wrongpass1!`, `Password1!` | Cuenta bloqueada |
-| CP15 | Login correcto despues de fallos parciales | 2 fallos previos | `Password1!`, `Password1!` | Acceso concedido y contador reiniciado |
-| CP16 | Login estando bloqueado | `bloqueado=True` | `Password1!`, `Password1!` | Acceso denegado |
-| CP17 | Login con contraseña debil pero correcta | No bloqueado | `123456`, `123456` | Acceso concedido segun el codigo actual |
-| CP18 | Login con contraseña debil incorrecta | No bloqueado | `123456`, `Password1!` | Cuenta como intento fallido |
-
-## Casos de prueba de estado
-
-| ID | Caso | Pasos | Resultado esperado |
-| --- | --- | --- | --- |
-| CP19 | Reiniciar bloqueo | Provocar 3 fallos y ejecutar `resetear_bloqueo()` | `bloqueado=False`, `intentos_fallidos=0` |
-| CP20 | Reiniciar sin bloqueo previo | Ejecutar `resetear_bloqueo()` en estado limpio | Estado permanece limpio |
-| CP21 | Intentos posteriores al bloqueo | Bloquear cuenta y volver a intentar | Sigue bloqueada y el contador no aumenta |
-| CP22 | Login correcto reinicia contador | 2 fallos y luego login correcto | `intentos_fallidos=0` |
-
-## Pruebas de seguridad
-
-| ID | Riesgo | Entrada | Resultado esperado |
-| --- | --- | --- | --- |
-| PS01 | Contraseñas comunes | `123456`, `password`, `qwerty` | Rechazadas cuando alcanzan las validaciones necesarias |
-| PS02 | Variacion de mayusculas/minusculas en comunes | `Admin123!` | Rechazada por comparacion con `lower()` |
-| PS03 | Contraseña debil por patron | `Aaaaaaa1!` | Aceptada por reglas actuales, aunque es debil |
-| PS04 | Payload tipo inyeccion | `"' OR '1'='1!"` | No concede acceso |
-| PS05 | Entrada vacia | `""` | Rechazada |
-| PS06 | Espacios al final | `Password1! ` | Aceptada por reglas actuales |
-| PS07 | Contraseña muy larga | 10,000 caracteres | No debe fallar |
-| PS08 | Unicode | `Contraseña1!` | Debe procesarse sin excepcion |
-| PS09 | `None` como contraseña | `None` | Lanza error segun codigo actual |
-| PS10 | Tipo numerico como contraseña | `12345678` | Lanza error segun codigo actual |
-
-## Pruebas negativas
+Estos casos corresponden al test parametrizado `test_validar_password_rechaza_passwords_invalidas`.
 
 | ID | Entrada | Resultado esperado |
 | --- | --- | --- |
-| PN01 | `None` | Excepcion documentada por comportamiento actual |
-| PN02 | Entero `12345678` | Excepcion documentada por comportamiento actual |
-| PN03 | Lista `["Password1!"]` | Rechazo por longitud |
-| PN04 | String vacio | Rechazo por longitud |
-| PN05 | Solo espacios | Rechazo por reglas actuales |
+| VP-01 | `Pass1!A` | Rechazo por tener menos de 8 caracteres |
+| VP-02 | `password1!` | Rechazo por no tener mayuscula |
+| VP-03 | `Password!` | Rechazo por no tener numero |
+| VP-04 | `Password1` | Rechazo por no tener caracter especial permitido |
+| VP-05 | `admin123!` | Rechazo por no tener mayuscula |
+| VP-06 | `Admin123!` | Rechazo por ser una contrasena comun |
+| VP-07 | `Password1#` | Rechazo por usar un caracter especial no permitido |
+| VP-08 | `""` | Rechazo por longitud menor a 8 caracteres |
 
-## Prioridad de automatizacion
+Cantidad ejecutada: 8.
 
-Prioridad alta:
+### Validacion de passwords validas segun reglas actuales
 
-- Validacion de contraseña valida.
-- Rechazo por cada regla individual.
-- Login exitoso.
-- Tres fallos consecutivos.
-- Bloqueo de cuenta.
-- Reset de bloqueo.
+Estos casos corresponden al test parametrizado `test_validar_password_acepta_passwords_validas_segun_reglas_actuales`.
 
-Prioridad media:
+| ID | Entrada | Resultado esperado |
+| --- | --- | --- |
+| VP-09 | `Password1!` | Password valida |
+| VP-10 | `Passw1!A` | Password valida |
+| VP-11 | `Password1@` | Password valida |
+| VP-12 | `Contrasena1!` con caracter Unicode en el archivo de prueba | Password valida |
+| VP-13 | `Password1! ` | Password valida segun reglas actuales, aunque tenga espacio final |
 
-- Entradas limite.
-- Caracteres especiales.
-- Contraseñas comunes.
-- Contraseñas muy largas.
+Cantidad ejecutada: 5.
 
-Prioridad alta de seguridad:
+### Entradas no string o no convencionales
 
-- Entrada `None`.
-- Login con contraseña debil pero correcta.
-- Intentos posteriores al bloqueo.
-- Payload tipo inyeccion.
+| ID | Test | Entrada | Resultado esperado |
+| --- | --- | --- | --- |
+| EN-01 | `test_validar_password_con_entradas_no_string_lanza_error` | `None` | Lanza `TypeError` o `AttributeError` |
+| EN-02 | `test_validar_password_con_entradas_no_string_lanza_error` | `12345678` | Lanza `TypeError` o `AttributeError` |
+| EN-03 | `test_validar_password_con_lista_rechaza_por_longitud` | `["Password1!"]` | Rechazo por longitud |
 
-## Observaciones de seguridad
+Cantidad ejecutada: 3.
 
-- `intentar_login()` valida la fortaleza de la contraseña ingresada, pero ignora el resultado.
-- Una contraseña debil puede conceder acceso si coincide con `password_correcta`.
-- Las contraseñas se comparan en texto plano.
-- El bloqueo pertenece al objeto completo, no a un usuario especifico.
-- No existe bloqueo temporal ni desbloqueo automatico.
-- No hay auditoria de intentos fallidos.
-- No hay control explicito de tipos de entrada.
+### Login, intentos fallidos y bloqueo
 
+| ID | Test | Escenario | Resultado esperado |
+| --- | --- | --- | --- |
+| LG-01 | `test_intentar_login_con_password_correcta_concede_acceso_y_reinicia_intentos` | Login correcto con 2 fallos previos | Acceso concedido, contador en 0 y cuenta no bloqueada |
+| LG-02 | `test_intentar_login_incorrecto_incrementa_intentos_y_muestra_restantes` | Primer login incorrecto | Acceso denegado, contador en 1 e intentos restantes en 2 |
+| LG-03 | `test_intentar_login_bloquea_cuenta_en_tercer_fallo` | Tercer login incorrecto consecutivo | Cuenta bloqueada y contador igual a `MAX_INTENTOS` |
+| LG-04 | `test_intentar_login_no_permite_acceso_si_la_cuenta_esta_bloqueada` | Login correcto con cuenta ya bloqueada | Acceso denegado por bloqueo |
+| LG-05 | `test_intentar_login_correcto_despues_de_fallos_parciales_reinicia_contador` | Login correcto despues de 2 fallos | Acceso concedido y contador reiniciado |
+| LG-06 | `test_intentar_login_password_debil_pero_correcta_concede_acceso_segun_codigo_actual` | Password debil pero correcta | Acceso concedido segun el codigo actual |
+| LG-07 | `test_intentar_login_password_debil_e_incorrecta_cuenta_como_fallo` | Password debil e incorrecta | Acceso denegado y contador incrementado |
+| LG-08 | `test_intentos_posteriores_al_bloqueo_no_aumentan_contador` | Intento posterior al bloqueo | Cuenta sigue bloqueada y contador no aumenta |
+
+Cantidad ejecutada: 8.
+
+### Reset de bloqueo
+
+| ID | Test | Escenario | Resultado esperado |
+| --- | --- | --- | --- |
+| RB-01 | `test_resetear_bloqueo_reinicia_estado_bloqueado` | Reset despues de provocar bloqueo | `intentos_fallidos=0` y `bloqueado=False` |
+| RB-02 | `test_resetear_bloqueo_en_estado_limpio_mantiene_estado_limpio` | Reset sin bloqueo previo | Estado permanece limpio |
+
+Cantidad ejecutada: 2.
+
+### Casos de seguridad y limite adicionales
+
+| ID | Test | Entrada o escenario | Resultado esperado |
+| --- | --- | --- | --- |
+| SG-01 | `test_validar_password_muy_larga_no_falla` | Password de mas de 10,000 caracteres | Validacion exitosa sin excepcion |
+| SG-02 | `test_intentar_login_con_payload_tipo_inyeccion_no_concede_acceso` | Payload `"' OR '1'='1!"` | Acceso denegado y contador incrementado |
+
+Cantidad ejecutada: 2.
+
+## Total de pruebas
+
+La suite contiene 16 funciones de test, pero varias estan parametrizadas. Pytest ejecuto 28 pruebas individuales:
+
+- 8 casos parametrizados de passwords invalidas.
+- 5 casos parametrizados de passwords validas.
+- 2 casos parametrizados de entradas no string.
+- 13 tests individuales adicionales.
+
+Total:
+
+```text
+8 + 5 + 2 + 13 = 28
+```
+
+## Casos no incluidos en este plan ejecutado
+
+Los siguientes puntos se consideran recomendaciones futuras, no pruebas ejecutadas en la suite actual:
+
+- Fuerza bruta distribuida por usuario o IP.
+- Bloqueo temporal con expiracion automatica.
+- Hashing y salting de contrasenas.
+- Comparacion segura con `hmac.compare_digest`.
+- Auditoria o logging de eventos de seguridad.
+- Pruebas de concurrencia.
+- Manejo de multiples usuarios.
+- Politicas avanzadas contra patrones debiles.
+
+## Criterio de aceptacion de la ejecucion
+
+La ejecucion se considera exitosa si las 28 pruebas individuales pasan sin errores ni fallos.
+
+Resultado observado:
+
+```text
+28 passed
+```
